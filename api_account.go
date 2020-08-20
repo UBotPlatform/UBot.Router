@@ -12,7 +12,10 @@ import (
 var accountEventsToForward = []string{
 	"on_receive_chat_message",
 	"on_member_joined",
-	"on_member_left"}
+	"on_member_left",
+	"process_group_invitation",
+	"process_friend_request",
+	"process_membership_request"}
 
 type eventResult struct {
 	Type int `json:"type"`
