@@ -18,7 +18,10 @@ var appAPIMethodsToForward = []string{
 	"shutup_all_member",
 	"get_member_name",
 	"get_user_avatar",
-	"get_self_id"}
+	"get_self_id",
+	"get_platform_id",
+	"get_group_list",
+	"get_member_list"}
 
 var appAPIRPC = func() *wsrpc.WebsocketRPC {
 	rpc := wsrpc.NewWebsocketRPC()
