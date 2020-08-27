@@ -28,6 +28,7 @@ var appAPIRPC = func() *wsrpc.WebsocketRPC {
 	for _, name := range appAPIMethodsToForward {
 		configAppAPIForward(rpc, name)
 	}
+	rpc.Register("get_bot_list", getBotList, nil, nil)
 	return rpc
 }()
 
@@ -53,6 +54,16 @@ func configAppAPIForward(rpc *wsrpc.WebsocketRPC, name string) {
 		return err
 	}
 	rpc.RegisterLowLevel(name, forwarder)
+}
+
+func getBotList() ([]string, error) {
+	var r []string
+	ClientListMutex.RLock()
+	for _, account := range Accounts {
+		r = append(r, account.ID)
+	}
+	ClientListMutex.RUnlock()
+	return r, nil
 }
 
 func AppApiSessionFactory(query url.Values, adapter wsrpc.MessageAdapter) error {
