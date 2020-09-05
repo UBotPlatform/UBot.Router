@@ -4,17 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-
-	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 )
-
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-	EnableCompression: false,
-}
 
 var managerUser string
 var managerPassword string
@@ -32,22 +22,13 @@ func main() {
 		fmt.Println("Password configured")
 	}
 	fmt.Println("Address: " + Addr)
-	router := mux.NewRouter()
-	router.HandleFunc("/", WelcomeHandler).Methods(http.MethodGet)
-	router.HandleFunc("/api/manager/get_token", GetManagerTokenHandler).Methods(http.MethodPost)
-
-	router.HandleFunc("/api/manager", WSRPCHandler(ManagerAPISessionFactory)).Methods(http.MethodGet)
-	router.HandleFunc("/api/account", WSRPCHandler(AccountAPIWSHandler)).Methods(http.MethodGet)
-	router.HandleFunc("/api/app", WSRPCHandler(AppApiSessionFactory)).Methods(http.MethodGet)
-
-	router.HandleFunc("/api/manager", HTTPPostRPCHandler(ManagerAPISessionFactory)).Methods(http.MethodPost)
-	router.HandleFunc("/api/account", HTTPPostRPCHandler(AccountAPIWSHandler)).Methods(http.MethodPost)
-	router.HandleFunc("/api/app", HTTPPostRPCHandler(AppApiSessionFactory)).Methods(http.MethodPost)
-
-	router.Use(CORSMiddleware)
-
-	http.Handle("/", router)
-	err := http.ListenAndServe(Addr, nil)
+	router := http.NewServeMux()
+	router.HandleFunc("/", WelcomeHandler)
+	router.HandleFunc("/api/manager/get_token", GetManagerTokenHandler)
+	router.HandleFunc("/api/manager", RPCHandler(ManagerAPISessionFactory))
+	router.HandleFunc("/api/account", RPCHandler(AccountAPIWSHandler))
+	router.HandleFunc("/api/app", RPCHandler(AppApiSessionFactory))
+	err := http.ListenAndServe(Addr, CORSMiddleware(router))
 	if err != nil {
 		fmt.Println("Cannot listen or serve: " + err.Error())
 	}
@@ -73,6 +54,10 @@ func GetManagerTokenHandler(writer http.ResponseWriter, request *http.Request) {
 }
 
 func WelcomeHandler(writer http.ResponseWriter, request *http.Request) {
+	if request.URL.Path != "/" {
+		http.NotFound(writer, request)
+		return
+	}
 	writer.WriteHeader(http.StatusOK)
 	writer.Header().Add("Content-Type", "text/plain")
 	_, _ = writer.Write([]byte("Welcome to use UBot.Router"))
@@ -83,7 +68,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		writer.Header().Set("Access-Control-Allow-Origin", "*")
 		writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, AccessToken, X-CSRF-Token, Authorization, Token")
 		writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		writer.Header().Set("Access-Control-Allow-Methods", "HEAD, GET, POST, PUT, PATCH, DELETE")
 		if request.Method == http.MethodOptions {
 			writer.WriteHeader(http.StatusNoContent)
 			return
