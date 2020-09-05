@@ -20,7 +20,6 @@ func (f RPCSessionHandler) WSRPCHandler(writer http.ResponseWriter, request *htt
 	query := request.URL.Query()
 	c, err := wsRPCUpgrader.Upgrade(writer, request, nil)
 	if err != nil {
-		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	defer c.Close()
