@@ -1,15 +1,18 @@
 package main
 
 import (
-	"encoding/base64"
+	"crypto/rand"
+	"io"
 	"sync"
 	"unicode"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/nicksnyder/basen"
 )
 
 func NewToken() string {
-	return base64.RawURLEncoding.EncodeToString(uuid.NewV4().Bytes())
+	var u [16]byte
+	_, _ = io.ReadFull(rand.Reader, u[:])
+	return basen.Base62Encoding.EncodeToString(u[:])
 }
 
 func Upperfirst(str string) string {
