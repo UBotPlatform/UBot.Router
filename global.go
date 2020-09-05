@@ -27,11 +27,13 @@ var Accounts = make(map[string]*AccountInfo)
 var Addr string
 
 func AllApps() []*AppInfo {
+	ClientListMutex.RLock()
 	r := make([]*AppInfo, len(Apps))
 	i := 0
 	for _, app := range Apps {
 		r[i] = app
 		i++
 	}
+	ClientListMutex.RUnlock()
 	return r
 }
