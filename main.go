@@ -50,16 +50,20 @@ func main() {
 }
 
 func GetManagerTokenHandler(writer http.ResponseWriter, request *http.Request) {
-	err := request.ParseForm()
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusBadRequest)
-		return
-	}
 	if len(managerUser) != 0 || len(managerPassword) != 0 {
-		user := request.Form.Get("user")
-		password := request.Form.Get("password")
+		user, password, basicAuthOK := request.BasicAuth()
+		if !basicAuthOK {
+			err := request.ParseForm()
+			if err == nil {
+				user = request.Form.Get("user")
+				password = request.Form.Get("password")
+			}
+		}
 		if (managerUser != "" && managerUser != user) || (managerPassword != "" && managerPassword != password) {
-			http.Error(writer, "User or password is incorrect", http.StatusForbidden)
+			writer.Header().Add("WWW-Authenticate", "Basic realm=\"Manager Area\"")
+			writer.Header().Add("Content-Type", "text/plain")
+			writer.WriteHeader(http.StatusUnauthorized)
+			_, _ = writer.Write([]byte("Unauthorized"))
 			return
 		}
 	}
@@ -77,8 +81,8 @@ func RootHandler(writer http.ResponseWriter, request *http.Request) {
 		http.NotFound(writer, request)
 		return
 	}
-	writer.WriteHeader(http.StatusOK)
 	writer.Header().Add("Content-Type", "text/plain")
+	writer.WriteHeader(http.StatusOK)
 	_, _ = writer.Write([]byte("Welcome to use UBot.Router"))
 }
 
