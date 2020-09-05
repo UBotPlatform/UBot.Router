@@ -4,17 +4,32 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 )
 
 var managerUser string
 var managerPassword string
+var forwardTarget *httputil.ReverseProxy
 
 func main() {
+	var err error
+	forwardTargetURLStr := ""
 	fmt.Println("UBot Router is running")
 	flag.StringVar(&managerUser, "user", "", "")
 	flag.StringVar(&managerPassword, "password", "", "")
 	flag.StringVar(&Addr, "addr", "localhost:5000", "")
+	flag.StringVar(&forwardTargetURLStr, "forward", "", "")
 	flag.Parse()
+	if forwardTargetURLStr != "" {
+		forwardTargetURL, err := url.Parse(forwardTargetURLStr)
+		if err != nil {
+			fmt.Println("Invaild forward target configured:", err)
+		} else {
+			forwardTarget = httputil.NewSingleHostReverseProxy(forwardTargetURL)
+			fmt.Println("Forward target configured:", forwardTargetURL.String())
+		}
+	}
 	if managerUser == "" && managerPassword == "" {
 		fmt.Println("No password configured")
 	} else {
@@ -23,12 +38,12 @@ func main() {
 	}
 	fmt.Println("Address: " + Addr)
 	router := http.NewServeMux()
-	router.HandleFunc("/", WelcomeHandler)
+	router.HandleFunc("/", RootHandler)
 	router.HandleFunc("/api/manager/get_token", GetManagerTokenHandler)
 	router.HandleFunc("/api/manager", RPCHandler(ManagerAPISessionFactory))
 	router.HandleFunc("/api/account", RPCHandler(AccountAPIWSHandler))
 	router.HandleFunc("/api/app", RPCHandler(AppApiSessionFactory))
-	err := http.ListenAndServe(Addr, CORSMiddleware(router))
+	err = http.ListenAndServe(Addr, CORSMiddleware(router))
 	if err != nil {
 		fmt.Println("Cannot listen or serve: " + err.Error())
 	}
@@ -53,7 +68,11 @@ func GetManagerTokenHandler(writer http.ResponseWriter, request *http.Request) {
 	_, _ = writer.Write([]byte(ManagerToken))
 }
 
-func WelcomeHandler(writer http.ResponseWriter, request *http.Request) {
+func RootHandler(writer http.ResponseWriter, request *http.Request) {
+	if forwardTarget != nil {
+		forwardTarget.ServeHTTP(writer, request)
+		return
+	}
 	if request.URL.Path != "/" {
 		http.NotFound(writer, request)
 		return
