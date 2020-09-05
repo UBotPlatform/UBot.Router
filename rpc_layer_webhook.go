@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,62 +10,11 @@ import (
 	"net/url"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/1354092549/wsrpc"
 )
-
-type onlyIdMessage struct {
-	ID json.RawMessage `json:"id"`
-}
-
-func isRPCNotification(data []byte) bool {
-	var test onlyIdMessage
-	err := json.Unmarshal(data, &test)
-	return err == nil && test.ID == nil
-}
-
-type HTTPRequestAdapter struct {
-	body      []byte
-	writer    http.ResponseWriter
-	waitChan  chan int
-	WroteOnce bool
-}
-
-func newHTTPRequestAdapter(body []byte, writer http.ResponseWriter) *HTTPRequestAdapter {
-	waitChan := make(chan int, 1)
-	r := &HTTPRequestAdapter{body: body, writer: writer, waitChan: waitChan}
-	if isRPCNotification(body) {
-		r.waitChan <- 0
-		r.WroteOnce = true
-	}
-	return r
-}
-
-func (a *HTTPRequestAdapter) ReadMessage() ([]byte, error) {
-	if a.body == nil {
-		<-a.waitChan
-		return nil, io.EOF
-	}
-	r := a.body
-	a.body = nil
-	return r, nil
-}
-
-func (a *HTTPRequestAdapter) WriteMessage(data []byte) error {
-	if a.WroteOnce {
-		return errors.New("cannot write message twice since this is a once message adapter")
-	}
-	a.WroteOnce = true
-	a.writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-	a.writer.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	a.writer.WriteHeader(http.StatusOK)
-	_, err := a.writer.Write(data)
-	a.waitChan <- 0
-	return err
-}
 
 type WebhookInfo struct {
 	Token   string `json:"token,omitempty"`
@@ -143,9 +91,9 @@ var webhooks sync.Map
 func createWebhook(controllerConn *wsrpc.WebsocketRPCConn, address string) (*WebhookInfo, error) {
 	parsedAddr, err := url.Parse(address)
 	if err != nil {
-		return nil, errors.New("invalid webhook address: " + err.Error())
+		return nil, fmt.Errorf("invalid webhook address: %w", err)
 	}
-	if parsedAddr.Scheme != "http" && parsedAddr.Scheme != "https" {
+	if !strings.EqualFold(parsedAddr.Scheme, "http") && !strings.EqualFold(parsedAddr.Scheme, "https") {
 		return nil, errors.New("invalid webhook address: only HTTP and HTTPS addresses are supported")
 	}
 	handler := controllerConn.Session["_handler"].(RPCSessionHandler)
@@ -175,33 +123,19 @@ var webhookControllerRPC = func() *wsrpc.WebsocketRPC {
 	return r
 }()
 
-func HTTPPostRPCHandler(handler RPCSessionHandler) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
-		query := request.URL.Query()
-		webhook, _ := strconv.ParseBool(query.Get("webhook"))
-		if webhook {
-			query.Del("webhook")
-			query.Del("norequest")
-		} else {
-			query.Set("norequest", "1")
+func WebhookControllerSessionFactory(handler RPCSessionHandler) RPCSessionHandler {
+	return func(query url.Values, adapter wsrpc.MessageAdapter) error {
+		internalQuery := make(url.Values)
+		for name, values := range query {
+			if name == "webhook" || name == "norequest" {
+				continue
+			}
+			internalQuery[name] = values
 		}
-		body, err := ioutil.ReadAll(request.Body)
-		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
-			return
-		}
-		httpAddr := newHTTPRequestAdapter(body, writer)
-		if webhook {
-			controllerConn := webhookControllerRPC.ConnectAdapter(httpAddr)
-			controllerConn.Session["_handler"] = handler
-			controllerConn.Session["_query"] = query
-			controllerConn.ServeConn()
-		} else {
-			err = handler(query, httpAddr)
-		}
-		if err != nil && !httpAddr.WroteOnce {
-			http.Error(writer, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		controllerConn := webhookControllerRPC.ConnectAdapter(adapter)
+		controllerConn.Session["_handler"] = handler
+		controllerConn.Session["_query"] = internalQuery
+		controllerConn.ServeConn()
+		return nil
 	}
 }
