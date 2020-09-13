@@ -76,11 +76,12 @@ func AccountAPIWSHandler(query url.Values, adapter wsrpc.MessageAdapter) error {
 	token := query.Get("token")
 	noRequest, _ := strconv.ParseBool(query.Get("norequest"))
 	ClientListMutex.RLock()
-	info, accountExists := Accounts[id]
+	rInfo, accountExists := Accounts.Get(id)
 	ClientListMutex.RUnlock()
 	if !accountExists {
 		return errors.New("id is not registered")
 	}
+	info := rInfo.(*AccountInfo)
 	if info.Token != token {
 		return errors.New("token is invalid")
 	}

@@ -39,11 +39,12 @@ func configAppAPIForward(rpc *wsrpc.WebsocketRPC, name string) {
 			return err
 		}
 		ClientListMutex.RLock()
-		info, accountExists := Accounts[bot]
+		rInfo, accountExists := Accounts.Get(bot)
 		ClientListMutex.RUnlock()
 		if !accountExists {
 			return wsrpc.RPCInvalidParamsError
 		}
+		info := rInfo.(*AccountInfo)
 		allConn := info.ConnList.All()
 		for _, conn := range allConn {
 			err = conn.CallLowLevel(name, params, reply)
@@ -59,7 +60,8 @@ func configAppAPIForward(rpc *wsrpc.WebsocketRPC, name string) {
 func getBotList() ([]string, error) {
 	var r []string
 	ClientListMutex.RLock()
-	for _, account := range Accounts {
+	for pair := Accounts.Oldest(); pair != nil; pair = pair.Next() {
+		account := pair.Value.(*AccountInfo)
 		r = append(r, account.ID)
 	}
 	ClientListMutex.RUnlock()
@@ -71,11 +73,12 @@ func AppApiSessionFactory(query url.Values, adapter wsrpc.MessageAdapter) error 
 	token := query.Get("token")
 	noRequest, _ := strconv.ParseBool(query.Get("norequest"))
 	ClientListMutex.RLock()
-	info, appExists := Apps[id]
+	rInfo, appExists := Apps.Get(id)
 	ClientListMutex.RUnlock()
 	if !appExists {
 		return errors.New("id is not registered")
 	}
+	info := rInfo.(*AppInfo)
 	if info.Token != token {
 		return errors.New("token is invalid")
 	}

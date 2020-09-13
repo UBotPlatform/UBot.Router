@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	"github.com/nicksnyder/basen"
+	orderedmap "github.com/wk8/go-ordered-map"
 )
 
 func NewToken() string {
@@ -25,15 +26,16 @@ func Upperfirst(str string) string {
 var ManagerToken = NewToken()
 var EnableAuthentication bool = false
 var ClientListMutex sync.RWMutex
-var Apps = make(map[string]*AppInfo)
-var Accounts = make(map[string]*AccountInfo)
+var Apps = orderedmap.New()
+var Accounts = orderedmap.New()
 var Addr string
 
 func AllApps() []*AppInfo {
 	ClientListMutex.RLock()
-	r := make([]*AppInfo, len(Apps))
+	r := make([]*AppInfo, Apps.Len())
 	i := 0
-	for _, app := range Apps {
+	for pair := Apps.Oldest(); pair != nil; pair = pair.Next() {
+		app := pair.Value.(*AppInfo)
 		r[i] = app
 		i++
 	}

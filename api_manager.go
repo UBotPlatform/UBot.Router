@@ -35,10 +35,13 @@ func getManagerMetadata(conn *wsrpc.WebsocketRPCConn) map[string]string {
 
 func registerApp(conn *wsrpc.WebsocketRPCConn, id string) string {
 	ClientListMutex.Lock()
-	info, ok := Apps[id]
-	if !ok {
+	rInfo, ok := Apps.Get(id)
+	var info *AppInfo
+	if ok {
+		info = rInfo.(*AppInfo)
+	} else {
 		info = &AppInfo{ID: id, Token: NewToken(), ManagerMetadata: getManagerMetadata(conn)}
-		Apps[id] = info
+		Apps.Set(id, info)
 	}
 	ClientListMutex.Unlock()
 	return info.Token
@@ -46,10 +49,13 @@ func registerApp(conn *wsrpc.WebsocketRPCConn, id string) string {
 
 func registerAccount(conn *wsrpc.WebsocketRPCConn, id string) string {
 	ClientListMutex.Lock()
-	info, ok := Accounts[id]
-	if !ok {
+	rInfo, ok := Accounts.Get(id)
+	var info *AccountInfo
+	if ok {
+		info = rInfo.(*AccountInfo)
+	} else {
 		info = &AccountInfo{ID: id, Token: NewToken(), ManagerMetadata: getManagerMetadata(conn)}
-		Accounts[id] = info
+		Accounts.Set(id, info)
 	}
 	ClientListMutex.Unlock()
 	return info.Token
@@ -58,7 +64,8 @@ func registerAccount(conn *wsrpc.WebsocketRPCConn, id string) string {
 func getAppList(conn *wsrpc.WebsocketRPCConn) []appInfoResponse {
 	var r []appInfoResponse
 	ClientListMutex.RLock()
-	for _, item := range Apps {
+	for pair := Apps.Oldest(); pair != nil; pair = pair.Next() {
+		item := pair.Value.(*AppInfo)
 		r = append(r, appInfoResponse{ID: item.ID, Token: item.Token, ManagerMetadata: item.ManagerMetadata})
 	}
 	ClientListMutex.RUnlock()
@@ -68,7 +75,8 @@ func getAppList(conn *wsrpc.WebsocketRPCConn) []appInfoResponse {
 func getAccountList(conn *wsrpc.WebsocketRPCConn) []accountInfoResponse {
 	var r []accountInfoResponse
 	ClientListMutex.RLock()
-	for _, item := range Accounts {
+	for pair := Accounts.Oldest(); pair != nil; pair = pair.Next() {
+		item := pair.Value.(*AccountInfo)
 		r = append(r, accountInfoResponse{ID: item.ID, Token: item.Token, ManagerMetadata: item.ManagerMetadata})
 	}
 	ClientListMutex.RUnlock()
