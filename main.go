@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 )
 
 var managerUser string
@@ -15,7 +16,7 @@ var forwardTarget *httputil.ReverseProxy
 func main() {
 	var err error
 	forwardTargetURLStr := ""
-	fmt.Println("UBot Router is running")
+	fmt.Printf("UBot Router is started at %s\n", time.Now().UTC().Format(time.RFC3339))
 	flag.StringVar(&managerUser, "user", "", "")
 	flag.StringVar(&managerPassword, "password", "", "")
 	flag.StringVar(&Addr, "addr", "localhost:5000", "")
