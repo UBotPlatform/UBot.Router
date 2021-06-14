@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 )
@@ -62,7 +61,7 @@ func (a *HTTPRequestAdapter) WriteMessage(data []byte) error {
 func (f RPCSessionHandler) HTTPPostRPCHandler(writer http.ResponseWriter, request *http.Request) {
 	query := request.URL.Query()
 	query.Set("norequest", "1")
-	body, err := ioutil.ReadAll(request.Body)
+	body, err := io.ReadAll(request.Body)
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return

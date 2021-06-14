@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -71,7 +70,7 @@ func (a *WebhookAdapter) WriteMessage(data []byte) error {
 		return err
 	}
 	defer resp.Body.Close()
-	msg, err := ioutil.ReadAll(resp.Body)
+	msg, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
